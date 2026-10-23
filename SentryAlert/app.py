@@ -7,6 +7,7 @@ from pathlib import Path
 import pandas as pd
 import requests
 import streamlit as st
+from sentryalert.scanner import parse_manifest, scan_packages, flatten_findings
 
 NVD_URL = "https://services.nvd.nist.gov/rest/json/cves/2.0"
 KEV_URL = "https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json"
@@ -14,13 +15,22 @@ OSV_URL = "https://api.osv.dev/v1/query"
 DB_PATH = Path(__file__).with_name("sentryalert.db")
 PAGE_SIZE = 100
 
-st.set_page_config(page_title="SentryAlert | Threat Intelligence", page_icon="🛡️", layout="wide")
+st.set_page_config(page_title="SentryAlert | Security Operations", page_icon="🛡️", layout="wide", initial_sidebar_state="expanded")
 st.markdown("""<style>
-.block-container{padding-top:1.5rem;max-width:1450px}
-[data-testid="stMetric"]{background:#14203510;border:1px solid #7b8ba030;border-radius:12px;padding:14px}
+.block-container{padding-top:1.2rem;max-width:1500px;padding-bottom:4rem}
+[data-testid="stMetric"]{background:linear-gradient(145deg,#15253d,#0d1829);border:1px solid #294362;border-radius:15px;padding:18px;box-shadow:0 5px 18px #02091440}
+[data-testid="stMetricLabel"]{color:#9fb5d2}
+[data-testid="stMetricValue"]{color:#e7f5ff}
+[data-testid="stSidebar"]{background:#0b1627;border-right:1px solid #253a52}
+[data-testid="stTabs"] button{font-weight:600}
 h1,h2,h3{letter-spacing:-.035em}
+h1{background:linear-gradient(100deg,#e7f5ff,#38bdf8);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
 .small-note{color:#8491a5;font-size:.85rem}
+.hero{padding:24px 26px;border:1px solid #28445e;border-radius:18px;background:radial-gradient(circle at 90% 0%,#104063,#101b2c 60%);margin-bottom:20px}
+.hero-title{font-size:2rem;font-weight:800;color:#e7f5ff}
+.hero-sub{color:#9cb6d2;margin-top:8px}
 </style>""", unsafe_allow_html=True)
+
 
 
 def db_connection():
@@ -107,8 +117,7 @@ def error_message(exc):
     return str(exc)
 
 
-st.title("🛡️ SentryAlert")
-st.caption("Vulnerability intelligence • Known exploitation alerts • Open-source dependency advisories")
+st.markdown("""<div class="hero"><div class="hero-title">🛡️ SENTRYALERT <span style="color:#38bdf8;font-size:1rem">/ SOC CONSOLE v2</span></div><div class="hero-sub">Security intelligence · CISA exploitation signals · Software composition analysis · Automated alerting</div></div>""", unsafe_allow_html=True)
 
 with st.sidebar:
     st.header("Intelligence controls")
@@ -117,7 +126,7 @@ with st.sidebar:
     severity_choice = st.selectbox("Severity (loaded page)",
                                    ["ALL", "CRITICAL", "HIGH", "MEDIUM", "LOW", "UNKNOWN"])
     only_kev = st.checkbox("Known exploited only (loaded page)")
-    if st.button("↻ Refresh cached intelligence", use_container_width=True):
+    if st.button("↻ Refresh cached intelligence", width="stretch"):
         get_nvd.clear()
         get_kev.clear()
         st.rerun()
@@ -125,9 +134,9 @@ with st.sidebar:
     st.caption("NVD results are paged; severity and KEV filters operate on the currently loaded page. Keyword search is server-side across the chosen date window.")
     st.caption("Public advisory data is not proof an individual server is vulnerable.")
 
-tab_overview, tab_explorer, tab_kev, tab_packages, tab_history, tab_about = st.tabs([
+tab_overview, tab_explorer, tab_kev, tab_packages, tab_scan, tab_history, tab_about = st.tabs([
     "📊 Overview", "🔎 CVE Explorer", "🚨 Exploited (KEV)",
-    "📦 Dependency Checker", "🕘 Lookup History", "ℹ️ About"
+    "📦 Dependency Checker", "🧪 Project Scanner", "🕘 Lookup History", "ℹ️ About"
 ])
 
 end = datetime.now(timezone.utc)
@@ -165,7 +174,7 @@ with tab_explorer:
         if shown:
             df = pd.DataFrame(shown)
             st.dataframe(df[["CVE", "Severity", "Score", "Published", "In CISA KEV", "Description"]],
-                         use_container_width=True, hide_index=True)
+                         width="stretch", hide_index=True)
             st.download_button("⬇ Download visible CSV", df.to_csv(index=False).encode("utf-8"),
                                file_name="sentryalert_cves.csv", mime="text/csv")
             chosen = st.selectbox("Inspect a CVE", [r["CVE"] for r in shown])
@@ -226,7 +235,7 @@ with tab_kev:
                      "Due date": x.get("dueDate"), "Description": x.get("shortDescription")}
                     for x in matches[:kev_limit]]
         if kev_rows:
-            st.dataframe(pd.DataFrame(kev_rows), use_container_width=True, hide_index=True)
+            st.dataframe(pd.DataFrame(kev_rows), width="stretch", hide_index=True)
             st.download_button("⬇ Download shown KEV records", pd.DataFrame(kev_rows).to_csv(index=False),
                                file_name="sentryalert_kev.csv", mime="text/csv")
         else:
@@ -271,6 +280,42 @@ with tab_packages:
             except (requests.RequestException, ValueError, sqlite3.Error) as exc:
                 st.error("Lookup failed: " + error_message(exc))
 
+with tab_scan:
+    st.subheader("Project dependency vulnerability scanner")
+    st.write("Upload a lockfile or pinned requirements file from a project you own or are authorized to assess. SentryAlert checks the declared versions against the OSV advisory database; it does **not** execute the uploaded file or probe your servers.")
+    upload = st.file_uploader("Upload manifest (max 5 MB)", type=["txt", "json", "lock"], key="manifest_upload")
+    st.caption("Supported filenames: requirements.txt, package-lock.json, npm-shrinkwrap.json, composer.lock. Python version ranges such as >= are skipped because an exact installed version is unknown.")
+    if upload is not None and st.button("Scan project dependencies", type="primary"):
+        try:
+            if upload.size > 5 * 1024 * 1024:
+                raise ValueError("File exceeds the 5 MB limit")
+            content = upload.getvalue().decode("utf-8-sig")
+            packages, skipped = parse_manifest(upload.name, content)
+            if skipped:
+                st.warning(f"Skipped {len(skipped)} unpinned or unsupported requirement lines. They were NOT checked.")
+                with st.expander("Show skipped lines"):
+                    st.code("\n".join(skipped[:100]))
+            if not packages:
+                st.warning("No exact-version dependencies found to check.")
+            else:
+                with st.spinner(f"Checking {len(packages)} dependencies against OSV..."):
+                    results = scan_packages(packages)
+                findings = flatten_findings(results)
+                a, b, c = st.columns(3)
+                a.metric("Dependencies checked", len(results))
+                b.metric("Packages with advisories", sum(r["count"] > 0 for r in results))
+                c.metric("Advisory matches", len(findings))
+                if findings:
+                    frame = pd.DataFrame(findings)
+                    st.dataframe(frame, width="stretch", hide_index=True)
+                    st.download_button("⬇ Export scan CSV", frame.to_csv(index=False), "sentryalert_scan.csv", "text/csv")
+                    st.download_button("⬇ Export scan JSON", json.dumps(results, indent=2), "sentryalert_scan.json", "application/json")
+                else:
+                    st.success("OSV returned no matches for the checked package versions. This does not guarantee security.")
+                st.caption("Advisories may be incomplete, delayed, or include disputed matches. Review affected ranges and vendor guidance before remediation.")
+        except (UnicodeDecodeError, ValueError, KeyError, TypeError, requests.RequestException) as exc:
+            st.error("Scan could not complete: " + error_message(exc))
+
 with tab_history:
     st.subheader("Local dependency lookup history")
     st.caption("History is stored in a local SQLite database beside app.py. It is not shared across devices.")
@@ -280,7 +325,7 @@ with tab_history:
         if history.empty:
             st.info("No dependency checks yet. Run one in the Dependency Checker tab.")
         else:
-            st.dataframe(history, use_container_width=True, hide_index=True)
+            st.dataframe(history, width="stretch", hide_index=True)
             st.download_button("⬇ Export history", history.to_csv(index=False),
                                file_name="sentryalert_history.csv", mime="text/csv")
     except sqlite3.Error as exc:
@@ -291,4 +336,5 @@ with tab_about:
     st.write("**Sources:** NIST NVD CVE API, CISA Known Exploited Vulnerabilities, OSV.dev advisory API.")
     st.write("**Limitations:** NVD may publish or update records after disclosure. Severity is not a measure of actual exposure. KEV membership indicates known exploitation, not that your systems are affected. OSV matches advisories for supplied package/version coordinates; package naming must be exact.")
     st.write("**Safety:** No active scanning, exploit execution, or credential collection is performed. Only assess systems you own or are authorized to test.")
-    st.write("**Next steps:** asset inventory, verified version matching for non-package software, alert subscriptions, authentication, background ingestion, and deployment.")
+    st.write("**Automated alerts:** GitHub Actions can create GitHub issues for newly added CISA KEV entries. Enable Actions and Issues in your repository. See README for setup.")
+    st.write("**Hosting:** Deploy app.py through Streamlit Community Cloud; scheduled alerts run separately in GitHub Actions.")
