@@ -1,89 +1,261 @@
 # 🛡️ SentryAlert v2
 
-**Security intelligence dashboard and passive open-source dependency vulnerability scanner.** Built with Python and Streamlit.
+**Cybersecurity Vulnerability Intelligence Dashboard & Open-Source Dependency Scanner**
 
-## Features
+SentryAlert is a Python-based cybersecurity dashboard built with Streamlit. It combines real-world vulnerability intelligence from NVD, CISA, and OSV with dependency vulnerability scanning, automated alerts, and interactive visualizations.
 
-- **SOC-style dark dashboard** with CVE metrics, charts, searchable NVD explorer, pagination, and CSV exports.
-- **CISA KEV** catalog for vulnerabilities known to have been exploited in the wild.
-- **OSV single-package lookup** for supported package ecosystems.
-- **Project dependency scanner:** upload `requirements.txt` (exact `==` pins), `package-lock.json`, `npm-shrinkwrap.json`, or `composer.lock`. Scans up to 250 packages in one OSV batch request and exports findings as CSV/JSON.
-- **Automated daily alerts:** GitHub Actions creates GitHub Issues for newly added CISA KEV entries (when enabled).
-- **Local SQLite history** for individual dependency lookups.
-- **Cloud deployment ready:** `.streamlit/config.toml` for Streamlit Community Cloud.
-- **Tests and CI** with pytest and GitHub Actions.
+The project is designed to help developers, students, and security enthusiasts explore publicly disclosed vulnerabilities and identify known security issues in open-source dependencies.
 
-## Run locally (Windows PowerShell)
+## ✨ Features
+
+### 1. Security Intelligence Dashboard
+- Dark, Security Operations Center (SOC)-inspired interface.
+- Latest publicly disclosed CVEs from the National Vulnerability Database (NVD).
+- CVSS severity scores and vulnerability descriptions.
+- Searchable vulnerability explorer with filters and pagination.
+- Interactive charts, security metrics, and CSV exports.
+
+### 2. CISA Known Exploited Vulnerabilities
+- Integration with CISA's Known Exploited Vulnerabilities (KEV) catalog.
+- Identification of vulnerabilities with evidence of exploitation in the wild.
+- Relevant vulnerability details for security prioritization.
+
+### 3. Dependency Vulnerability Scanner
+- Scan supported dependency files for known security advisories.
+- Supported file formats:
+  - Python: `requirements.txt` with exact `==` version pins.
+  - JavaScript: `package-lock.json` and `npm-shrinkwrap.json`.
+  - PHP: `composer.lock`.
+- Uses the OSV vulnerability database for package and version matching.
+- Supports up to 250 packages per batch scan.
+- Export scan findings as CSV or JSON.
+
+### 4. Automated Security Alerts
+- GitHub Actions workflow for monitoring CISA KEV catalog additions.
+- Scheduled daily vulnerability checks.
+- Creates GitHub Issues for newly identified KEV entries when configured.
+- Uses GitHub's built-in workflow authentication.
+
+### 5. Additional Features
+- SQLite history for individual dependency lookups.
+- Automated tests using pytest.
+- GitHub Actions continuous integration.
+- Streamlit Community Cloud deployment support.
+
+## 🛠️ Technology Stack
+
+| Technology | Purpose |
+|---|---|
+| Python | Application development |
+| Streamlit | Interactive web dashboard |
+| Pandas | Data processing |
+| Requests | External API communication |
+| SQLite | Local lookup history |
+| NVD API | CVE vulnerability intelligence |
+| CISA KEV | Known exploited vulnerability intelligence |
+| OSV API | Open-source dependency vulnerability matching |
+| Pytest | Automated testing |
+| GitHub Actions | CI and automated alerts |
+
+## 📁 Project Structure
+
+```text
+SentryAlert/
+├── .github/
+│   └── workflows/
+│       ├── kev-alerts.yml
+│       └── tests.yml
+│
+└── SentryAlert/
+    ├── .streamlit/
+    │   └── config.toml
+    ├── sentryalert/
+    │   ├── __init__.py
+    │   ├── alerts.py
+    │   └── scanner.py
+    ├── tests/
+    │   └── test_scanner.py
+    ├── app.py
+    ├── requirements.txt
+    ├── README.md
+    └── .gitignore
+```
+
+The application is located in the inner `SentryAlert/` directory, while GitHub Actions workflows are located at the repository root.
+
+## 🚀 Installation and Local Setup
+
+### Prerequisites
+
+- Python 3.11 or newer, with compatible dependencies.
+- Git.
+- Internet connection for vulnerability API requests.
+
+### Step 1 — Clone the repository
 
 ```powershell
-cd C:\Users\midhu\Downloads\SentryAlert
+git clone https://github.com/MYSTICOP221/SentryAlert.git
+cd SentryAlert\SentryAlert
+```
+
+### Step 2 — Create a virtual environment
+
+```powershell
 python -m venv .venv
+```
+
+### Step 3 — Activate the virtual environment
+
+On Windows PowerShell:
+
+```powershell
 .\.venv\Scripts\Activate.ps1
+```
+
+If PowerShell blocks activation, you can run the virtual environment's Python executable directly without activating it.
+
+### Step 4 — Install dependencies
+
+```powershell
 python -m pip install -r requirements.txt
+```
+
+### Step 5 — Launch SentryAlert
+
+```powershell
 python -m streamlit run app.py
 ```
 
-Open http://localhost:8501. If Windows blocks activation, you can skip activation and use `.\.venv\Scripts\python.exe -m pip install -r requirements.txt` and `.\.venv\Scripts\python.exe -m streamlit run app.py`.
+Open the dashboard in your browser:
 
-## Run tests
+**http://localhost:8501**
+
+To stop the application, press `Ctrl + C` in the terminal.
+
+## 🔎 How to Use the Dependency Scanner
+
+1. Launch the SentryAlert dashboard.
+2. Open the **Dependency Scanner** section.
+3. Upload a supported dependency file.
+4. Start the vulnerability scan.
+5. Review matched advisories, affected packages, and available severity information.
+6. Export the results as CSV or JSON.
+
+### Example Python dependency file
+
+Create a file named `test-requirements.txt`:
+
+```text
+requests==2.19.0
+urllib3==1.24.1
+Jinja2==2.10
+```
+
+Upload this file to test the scanner using intentionally outdated package versions.
+
+**Note:** Do not install these outdated dependencies. The file is intended only for scanner testing.
+
+The scanner identifies published vulnerability advisories associated with declared package versions. It does not execute the dependencies or perform active exploitation.
+
+## 🧪 Running Automated Tests
+
+From the inner `SentryAlert/` directory:
 
 ```powershell
 python -m pip install pytest
 python -m pytest -q
 ```
 
-## Upgrade an existing GitHub repository
+The repository also contains a GitHub Actions workflow for automated test execution.
 
-Your current Git repository is `Downloads\SentryAlert`, but your application is in `Downloads\SentryAlert\SentryAlert`. The included `UPGRADE_WINDOWS.ps1` handles this structure: it copies app files to the inner folder and GitHub workflows to the **outer repository root** (required by GitHub Actions). Keep your local `.venv` and database; don't upload them.
+## 🔔 Automated Vulnerability Alerts
 
-After extracting the ZIP to `Downloads\SentryAlert-v2`, open PowerShell in that extracted folder and run:
+SentryAlert includes a GitHub Actions workflow that checks for newly added entries in the CISA KEV catalog.
 
-```powershell
-.\UPGRADE_WINDOWS.ps1
-```
+### Enable alerts
 
-Review the staged changes before committing.
+1. Open the GitHub repository.
+2. Go to **Settings → General → Features** and enable **Issues**.
+3. Go to **Settings → Actions → General** and ensure GitHub Actions is enabled.
+4. Ensure the workflow has permission to create issues using `issues: write` or the required repository workflow permissions.
+5. Open **Actions → CISA KEV alerts**.
+6. Select **Run workflow** to execute a manual test.
 
-```powershell
-git add SentryAlert/app.py SentryAlert/requirements.txt SentryAlert/README.md SentryAlert/.gitignore SentryAlert/sentryalert SentryAlert/tests SentryAlert/.streamlit .github
-git status
-git commit -m "Release SentryAlert v2: scanner, alerts and cloud deployment"
-git push origin main
-```
+The workflow is configured to run daily at approximately **09:17 UTC**, although GitHub may delay scheduled jobs.
 
-## Automated GitHub alerts
+When new KEV entries are identified, the workflow can create GitHub Issues to record them. It checks up to 100 existing issues for duplicates, so larger repositories may require improved pagination.
 
-1. On GitHub, open your SentryAlert repository → **Settings → General → Features**, enable **Issues**.
-2. Under **Settings → Actions → General**, ensure workflows are allowed and workflow permissions permit **Read and write permissions** (or otherwise allow `issues: write` for the workflow).
-3. Push `.github/workflows/kev-alerts.yml` to your **default branch**.
-4. Open **Actions → CISA KEV alerts → Run workflow** to test manually. The schedule runs daily around 09:17 UTC; GitHub may delay scheduled runs.
-5. Each newly listed KEV CVE is posted as a GitHub Issue. The job checks existing issues (up to 100) to avoid duplicates; for very busy repositories, improve pagination before relying on deduplication.
+**Important:** Automated alerts cover newly added CISA KEV catalog entries, not every newly published CVE or vulnerabilities on a user's computer.
 
-No personal access token is needed for GitHub Actions; it uses the repository-provided `GITHUB_TOKEN`. GitHub Issues notifications depend on your GitHub notification settings. **This workflow alerts on new KEV catalog additions, not every new CVE or a scan of your own machine.**
+## ☁️ Deploying SentryAlert Online
 
-## Deploy the dashboard online
+SentryAlert can be deployed using Streamlit Community Cloud.
 
-1. Push the v2 code to GitHub.
-2. Go to [Streamlit Community Cloud](https://share.streamlit.io/) and sign in with GitHub.
-3. Select **Create app** → **Deploy a public app from GitHub** (wording may vary).
-4. Choose repository `MYSTICOP221/SentryAlert`, branch `main`, and entry point **`SentryAlert/app.py`** (your existing repository has a nested application folder).
-5. Choose a public app URL and click **Deploy**.
-6. Check the app logs if dependencies or API requests fail. The GitHub alert workflow is separate from the deployed app.
+### Deployment steps
 
-> Cloud filesystem persistence is not guaranteed: local SQLite history may reset after restarts and is not a multi-user account system. For persistent history, add a managed database and authentication. Do not upload private lockfiles to a public demo unless you are comfortable sharing package names and versions with the app provider and OSV.
+1. Push the latest project files to GitHub.
+2. Visit https://share.streamlit.io/.
+3. Sign in using GitHub.
+4. Choose to deploy an application from an existing GitHub repository.
+5. Configure the application:
 
-## Sources and limitations
+| Setting | Value |
+|---|---|
+| Repository | `MYSTICOP221/SentryAlert` |
+| Branch | `main` |
+| Main file path | `SentryAlert/app.py` |
 
-- NVD: https://nvd.nist.gov/developers/vulnerabilities
-- CISA KEV: https://www.cisa.gov/known-exploited-vulnerabilities-catalog
-- OSV: https://osv.dev/
+6. Click **Deploy**.
+7. Wait for Streamlit to install dependencies and start the application.
 
-SentryAlert performs **passive advisory matching**, not live network scanning, penetration testing, or zero-day discovery. An advisory match needs manual verification of affected version ranges, environment, and mitigations. Missing results do not prove a package is secure. NVD rate limits may apply; try again later if requests fail.
+The GitHub Actions alert workflow runs separately from the hosted Streamlit application.
 
-## Security and privacy
+**Cloud storage limitation:** SQLite history stored on the application filesystem may be lost after restarts or redeployments. Persistent multi-user storage requires a managed database and appropriate authentication.
 
-`.gitignore` excludes `.venv`, `.env`, `.streamlit/secrets.toml`, Python caches, and SQLite databases. Never commit secrets, tokens, or private scan results.
+## 🌐 Data Sources
 
-## License
+SentryAlert uses publicly available cybersecurity intelligence sources:
 
-No license is granted by default. Add a license if you want to authorize others to reuse your code.
+- **National Vulnerability Database (NVD):** https://nvd.nist.gov/developers/vulnerabilities
+- **CISA Known Exploited Vulnerabilities:** https://www.cisa.gov/known-exploited-vulnerabilities-catalog
+- **Open Source Vulnerabilities (OSV):** https://osv.dev/
+
+API availability, request limits, and advisory coverage may affect results.
+
+## 🔐 Security and Privacy
+
+SentryAlert performs passive vulnerability intelligence and dependency advisory matching.
+
+It does **not** provide:
+- Active network vulnerability scanning.
+- Penetration testing or exploitation.
+- Zero-day vulnerability discovery.
+- A guarantee that scanned software is secure.
+
+Vulnerability findings should be reviewed against affected version ranges, deployment conditions, and vendor remediation guidance.
+
+The `.gitignore` excludes local virtual environments, environment files, Python caches, Streamlit secrets, and SQLite database files.
+
+Never commit API keys, passwords, private scan results, or other sensitive information.
+
+When using the public dashboard, avoid uploading confidential dependency files unless you understand how the application and OSV API process the supplied package information.
+
+## 🗺️ Future Improvements
+
+- Support for additional dependency ecosystems.
+- SBOM (Software Bill of Materials) scanning.
+- Improved vulnerability prioritization.
+- Email or webhook-based security notifications.
+- Persistent cloud database integration.
+- Authentication and user-specific scan history.
+- Additional automated scanner tests.
+
+## 📜 License
+
+No open-source license has been added yet. All rights are reserved by default.
+
+A license may be added in the future to specify permissions for using, modifying, and distributing the project.
+
+---
+
+**SentryAlert v2 — Security Intelligence, Dependency Analysis, and Vulnerability Awareness.**
