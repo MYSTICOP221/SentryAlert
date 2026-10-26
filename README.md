@@ -1,8 +1,8 @@
-# 🛡️ SentryAlert v2
+﻿# 🛡️ SentryAlert v2
 
 **Vulnerability intelligence dashboard and passive open-source dependency scanner**, built with Python and Streamlit.
 
-![SentryAlert dashboard](images/dashboard.png)
+![SentryAlert dashboard](SentryAlert/images/dashboard.png)
 
 SentryAlert combines public CVE data from NVD, CISA's Known Exploited Vulnerabilities (KEV) catalog, and OSV package advisories. Use it to explore security advisories and check declared dependency versions against known vulnerabilities.
 
@@ -38,7 +38,6 @@ SentryAlert/                         # GitHub repository root
     │   └── test_scanner.py
     ├── app.py
     ├── requirements.txt
-    ├── README.md
     └── .gitignore
 ```
 
